@@ -3,24 +3,17 @@ const morgan = require("morgan");
 const helmet = require("helmet");
 const RedisClient = require("./db/redis");
 const CronJob = require("./ultis/cron");
-const http = require("http");
-const { Server } = require("socket.io");
 const consumer = require("./ultis/kafka_consumer");
+const http = require("http");
+const SocketServer = require("./socket");
 // App - Socket
 const app = express();
 const server = http.createServer(app);
-const socketService = new Server(server);
-socketService.on("connection", (socket) => {
-  console.log("New Connected:", socket.handshake.address);
-  socket.on("disconnect", () => {
-    console.log("Disconnected:", socket.handshake.address);
-  });
-});
+const socket = new SocketServer(server);
 // Middleware
 app.use(morgan("dev"));
 app.use(helmet());
 app.use(express.json());
-app.use(require("./auth/login_required"));
 // Consumer
 consumer.connect().catch(console.error);
 // Database
@@ -45,7 +38,6 @@ app.use((err, req, res, next) => {
 });
 // Export
 module.exports = {
-  app,
   server,
-  socketService,
+  socket,
 };

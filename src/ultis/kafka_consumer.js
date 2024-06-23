@@ -1,6 +1,7 @@
 const { Kafka } = require("kafkajs");
 const bookingModel = require("../model/booking.model");
 const producer = require("../ultis/kafka_producer");
+const { KAFKA_HOST, KAFKA_PORT } = require("../settings");
 class KafkaConsumer {
   constructor({ clientId, brokers, topic }) {
     this.kafka = new Kafka({
@@ -43,7 +44,7 @@ class KafkaConsumer {
 
 const consumer = new KafkaConsumer({
   clientId: "booking-service",
-  brokers: ["localhost:9092"],
+  brokers: [`${KAFKA_HOST}:${KAFKA_PORT}`],
   topic: "payment_return",
 });
 consumer.connect();

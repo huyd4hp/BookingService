@@ -10,6 +10,9 @@ MONGO_DATABASE = process.env.MONGO_DATABASE || Booking;
 // Redis
 REDIS_HOST = process.env.REDIS_HOST || "127.0.0.1";
 REDIS_PORT = +process.env.REDIS_PORT || 6379;
+// Kafka
+KAFKA_HOST = process.env.KAFKA_HOST || "localhost";
+KAFKA_PORT = +process.env.KAFKA_PORT || 9092;
 // Secret key
 ACCESS_KEY = process.env.ACCESS_KEY;
 REFRESH_KEY = process.env.REFRESH_KEY;
@@ -24,4 +27,6 @@ module.exports = {
   REDIS_PORT,
   ACCESS_KEY,
   REFRESH_KEY,
+  KAFKA_HOST,
+  KAFKA_PORT,
 };

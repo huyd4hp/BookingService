@@ -32,5 +32,4 @@ const producer = new KafkaProducer({
   clientId: "my-app",
   brokers: [`${KAFKA_HOST}:${KAFKA_PORT}`],
 });
-producer.connect();
 module.exports = producer;

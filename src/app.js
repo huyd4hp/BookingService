@@ -10,6 +10,15 @@ const SocketServer = require("./socket");
 const app = express();
 const server = http.createServer(app);
 const socket = new SocketServer(server);
+// CORS
+app.use(function (req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept"
+  );
+  next();
+});
 // Middleware
 app.use(morgan("dev"));
 app.use(helmet());

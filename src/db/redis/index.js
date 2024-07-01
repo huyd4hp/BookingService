@@ -1,6 +1,6 @@
 const redis = require("redis");
 const { REDIS_HOST, REDIS_PORT } = require("../../settings");
-
+const colors = require("colors");
 let statusConnect = {
   CONNECT: "connect",
   END: "end",
@@ -15,20 +15,19 @@ const client = redis.createClient({
 });
 
 client.on(statusConnect.CONNECT, () => {
-  console.info("Connected to Redis");
+  console.log(colors.green(`INFO:     `), "Connected to Redis");
 });
 
 client.on(statusConnect.END, () => {
-  console.info("Disconnected to Redis");
+  console.log(colors.green(`INFO:     `), "Disconnected to Redis");
 });
 
 client.on(statusConnect.ERROR, (err) => {
-  console.info("Disconnected to Redis");
-  console.info(`${err}`);
+  console.log(colors.red(`ERROR:     `), `REDIS: ${err}`);
 });
 
 client.on(statusConnect.RECONNECT, () => {
-  console.info("Reconnection to Redis");
+  console.log(colors.yellow(`INFO:     `), "Reconnection to Redis");
 });
 
 module.exports = client;

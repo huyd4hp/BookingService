@@ -18,6 +18,11 @@ router.get(
   login_required,
   handleRouter(bookingController.FindBooking)
 );
-router.post("/checkin", handleRouter(bookingController.FindBookingDetail));
+router.get(
+  "/manage/bookings",
+  login_required,
+  handleRouter(bookingController.ManageBooking)
+);
+router.post("/checkin", handleRouter(bookingController.CheckIn));
 // Export
 module.exports = router;

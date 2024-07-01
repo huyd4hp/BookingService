@@ -1,164 +1,134 @@
 const bookingService = require("../service/booking.services");
 const EventService = require("../ultis/event_service");
 const producer = require("../ultis/kafka_producer");
+const Payment = require("../ultis/payment");
+const { socket } = require("../app");
 // Controller
 class BookingController {
   static Booking = async (req, res, next) => {
-    const { seat_id } = req.body;
-    const { CLIENT_ID, CLIENT_NAME, CLIENT_EMAIL } = req.headers;
-    if (!seat_id) {
+    const { CLIENT_ID, CLIENT_EMAIL } = req.headers;
+    const { event, voucher, total } = req.body;
+    if (!event) {
       return res.status(400).json({
-        detail: [
-          {
-            loc: ["body", "seat_id"],
-            msg: "field required",
-            type: "value_error.missing",
-          },
-        ],
-      });
-    }
-    // - Check Seat in Booking
-    const holderBooking = await bookingService.GetBySeatID(seat_id);
-    if (holderBooking) {
-      require("../app").socket.push(
-        CLIENT_ID,
-        "booking",
-        `Seat ${seat_id}: ${holderBooking.status}`
-      );
-      return res.status(409).json({
         status: "error",
-        message: "booking refused",
-        detail: `Seat ${seat_id}: ${holderBooking.status}`,
+        message: "Missing event",
       });
     }
-    const data = {
-      ...req.body,
-      buyer_id: CLIENT_ID,
-      buyer_name: CLIENT_NAME,
-      buyer_email: CLIENT_EMAIL,
-    };
-    let SeatInfo = undefined;
-    let VoucherInfo = undefined;
-    let total = 0;
-    SeatInfo = await EventService.FindSeat(data.seat_id);
-    if (!SeatInfo) {
-      require("../app").socket.push(CLIENT_ID, "booking", "Seat Not Found");
+    const EventBooking = await EventService.FindEvent(event);
+    if (!EventBooking) {
       return res.status(404).json({
         status: "error",
-        message: "booking refused",
-        detail: `Seat Not Found`,
+        message: "Event Not Found",
       });
     }
-    data["event_owner"] = SeatInfo["event_owner"];
-    if (SeatInfo["status"] != "NotOrdered") {
-      require("../app").socket.push(
-        CLIENT_ID,
-        "booking",
-        `Seat ${SeatInfo["status"]}`
-      );
+    const holderbooking = await bookingService.CheckUserInEvent(
+      event,
+      CLIENT_ID
+    );
+    if (holderbooking) {
+      require("../app").socket.push(CLIENT_ID, "Booking", {
+        status: "Failed",
+        message: "You have already joined this event.",
+      });
+      return res.status(409).json({
+        status: "error",
+        message: "You have already joined this event.",
+      });
+    }
+    const Seats = await EventService.FindSeats(event, "NotOrdered");
+    if (Seats.length == 0) {
+      require("../app").socket.push(CLIENT_ID, "Booking", {
+        status: "Failed",
+        message: "Seat Sold Out",
+      });
       return res.status(400).json({
         status: "error",
-        message: "booking refused",
-        detail: `Seat ${SeatInfo["status"]}`,
+        message: "Seat Sold Out",
       });
     }
-    total = total + SeatInfo["price"];
-    if (data.hasOwnProperty("voucher_id")) {
-      VoucherInfo = await EventService.FindVoucher(data.voucher_id);
-      if (!VoucherInfo) {
-        require("../app").socket.push(
-          CLIENT_ID,
-          "booking",
-          `Voucher Not Found`
-        );
+    const AnySeat = Seats[0];
+    let retotal = AnySeat["price"];
+    if (voucher) {
+      const Voucher = await EventService.FindVoucher(voucher);
+      if (!Voucher) {
+        require("../app").socket.push(CLIENT_ID, "Booking", {
+          status: "Failed",
+          message: "Voucher Not Found",
+        });
         return res.status(404).json({
           status: "error",
-          message: "booking refused",
-          detail: `Voucher Not Found`,
+          message: "Voucher Not Found",
         });
       }
-      if (VoucherInfo["event"] != SeatInfo["event"]) {
-        require("../app").socket.push(
-          CLIENT_ID,
-          "booking",
-          `Not Suitable Voucher`
-        );
+      if (Voucher["event"] != event) {
+        require("../app").socket.push(CLIENT_ID, "Booking", {
+          status: "Failed",
+          message: "Not Suitable Voucher",
+        });
         return res.status(400).json({
           status: "error",
-          message: "booking refused",
-          detail: `Not Suitable Voucher`,
+          message: "Not Suitable Voucher",
         });
       }
-    }
-    if (data.hasOwnProperty("addons_id")) {
-      for (let id of data.addons_id) {
-        const AddonInfo = await EventService.FindAddon(id);
-        if (!AddonInfo) {
-          require("../app").socket.push(
-            CLIENT_ID,
-            "booking",
-            `Addon (ID:${id}) Not Found`
-          );
-          return res.status(404).json({
-            status: "error",
-            message: "booking refused",
-            detail: `Addon (ID:${id}) Not Found`,
-          });
-        }
-        if (AddonInfo["event"] != SeatInfo["event"]) {
-          require("../app").socket.push(
-            CLIENT_ID,
-            "booking",
-            `Not Suitable Addon`
-          );
-          return res.status(400).json({
-            status: "error",
-            message: "booking refused",
-            detail: `Not Suitable Addon`,
-          });
-        }
-        total = total + AddonInfo["price"];
-      }
-    }
-    if (VoucherInfo !== undefined) {
-      const discount = (total * VoucherInfo["discount_percent"]) / 100;
-      if (discount <= VoucherInfo["discount_max"]) {
-        total = total - discount;
+      const discount = Voucher["discount_percent"] * retotal;
+      if (discount <= Voucher["discount_max"]) {
+        retotal -= discount;
       } else {
-        total = total - VoucherInfo["discount_max"];
+        retotal -= Voucher["discount_max"];
       }
     }
-    data["total"] = total;
-    const newBooking = await bookingService.AddBooking(data);
+    let data = {
+      ...req.body,
+      total: retotal,
+      seat: AnySeat["id"],
+      buyer_id: CLIENT_ID,
+      buyer_email: CLIENT_EMAIL,
+      event_owner: EventBooking["owner"],
+    };
+    if (voucher) {
+      data = {
+        ...data,
+        voucher: voucher,
+      };
+    }
+    const booking = await bookingService.AddBooking(data);
+    const payment_url = await Payment.GeneralPaymentURL(
+      booking._id,
+      req.headers["authorization"]
+    );
+    require("../app").socket.push(CLIENT_ID, "Booking", {
+      status: "Accept",
+      message: {
+        booking,
+        payment_url: payment_url,
+      },
+    });
+    await producer.connect();
     producer.sendMessage(
       "booking",
-      newBooking._id.toString(),
-      JSON.stringify(newBooking)
+      booking._id.toString(),
+      JSON.stringify(booking)
     );
-    require("../app").socket.push(CLIENT_ID, "booking", {
-      status: "Booking Accept",
-      metadata: newBooking,
-    });
+    await producer.disconnect();
     return res.status(200).json({
-      status: "success",
-      message: "Booking Accept",
-      metadata: newBooking,
+      ...booking,
+      payment_url: payment_url,
     });
   };
-
   static HistoryBooking = async (req, res, next) => {
     const { CLIENT_ID } = req.headers;
-    const metadata = await bookingService.All(CLIENT_ID);
+    const metadata = await bookingService.Filter({
+      buyer_id: CLIENT_ID,
+    });
     return res.status(200).json({
       status: "success",
       metadata: metadata,
     });
   };
-
   static FindBooking = async (req, res, next) => {
     const { CLIENT_ID } = req.headers;
     const id = req.params.id;
-    const metadata = await bookingService.GetByID(id);
+    const metadata = await bookingService.FindByID(id);
     if (!metadata) {
       return res.status(404).json({
         status: "error",
@@ -176,36 +146,45 @@ class BookingController {
       metadata: metadata,
     });
   };
-
-  static FindBookingDetail = async (req, res, next) => {
-    const { booking_id } = req.body;
-    if (!booking_id) {
+  static CheckIn = async (req, res, next) => {
+    const { booking_code } = req.body;
+    if (!booking_code) {
       return res.status(400).json({
-        detail: [
-          {
-            loc: ["body", "booking_id"],
-            msg: "field required",
-            type: "value_error.missing",
-          },
-        ],
+        status: "error",
+        message: "Missing Booking Code",
       });
     }
-    const booking = await bookingService.GetByID(booking_id);
+    const booking = await bookingService.FindByBookingCode(booking_code);
     if (!booking) {
       return res.status(404).json({
         status: "error",
-        message: "Booking Not Found",
+        message: "Not Found Booking",
       });
     }
-    const seat = await EventService.FindSeat(booking.seat_id);
-    const event = await EventService.FindEvent(seat.event);
     return res.status(200).json({
       status: "success",
-      metadata: {
-        booking,
-        ...seat,
-        ...event,
-      },
+      metadata: await bookingService.CheckIn(booking_code),
+    });
+  };
+  static ManageBooking = async (req, res, next) => {
+    const { CLIENT_ID, CLIENT_ROLE } = req.headers;
+    let metadata = undefined;
+    if (CLIENT_ROLE === "User") {
+      return res.status(403).json({
+        status: "error",
+        message: "Access Forbidden",
+      });
+    }
+    if (CLIENT_ROLE === "EventAdmin") {
+      metadata = await bookingService.Filter({
+        event_owner: CLIENT_ID,
+      });
+    } else {
+      metadata = await bookingService.Filter();
+    }
+    return res.status(200).json({
+      status: "success",
+      metadata: metadata,
     });
   };
 }

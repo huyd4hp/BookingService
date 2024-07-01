@@ -28,11 +28,11 @@ const login_required = async (req, res, next) => {
     //---//
     const firstName = payload.first_name || "";
     const lastName = payload.last_name || "";
-    const CLIENT_EMAIL = payload.email;
     //---//
     req.headers.CLIENT_ID = payload._id;
+    req.headers.CLIENT_ROLE = payload.role;
     req.headers.CLIENT_NAME = `${firstName} ${lastName}`.trim();
-    req.headers.CLIENT_EMAIL = CLIENT_EMAIL;
+    req.headers.CLIENT_EMAIL = payload.email;
     next();
   });
 };

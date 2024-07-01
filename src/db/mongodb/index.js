@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const colors = require("colors");
 const {
   MONGO_HOST,
   MONGO_PORT,
@@ -13,18 +14,16 @@ class Database {
     this.connect();
   }
   connect() {
-    if (2 == 1) {
-      mongoose.set("debug", true);
-      mongoose.set("debug", { color: true });
-    }
     mongoose
       .connect(this.connectString, {
         dbName: MONGO_DATABASE,
       })
       .then((_) => {
-        console.info("Connected to MongoDB");
+        console.log(colors.green(`INFO:     `), "Connected to MongoDB");
       })
-      .catch((error) => console.log(`Error:  ${error}!`));
+      .catch((error) => {
+        console.log(colors.red(`ERROR:     `), `${error}`);
+      });
   }
   //
   static getInstance() {

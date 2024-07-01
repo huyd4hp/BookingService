@@ -8,6 +8,6 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
     volumes:
-      - ./database/mongodb/:/data/db
+      - ./mongodb/:/data/db
     ports:
       - "${MONGO_PORT}:27017"

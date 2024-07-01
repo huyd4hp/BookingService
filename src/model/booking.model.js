@@ -9,6 +9,10 @@ const BookingStatus = {
 };
 var bookingSchema = new mongoose.Schema(
   {
+    booking_code: {
+      type: String,
+      unique: true,
+    },
     buyer_id: {
       type: String,
       required: true,
@@ -24,16 +28,16 @@ var bookingSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    seat_id: {
+    seat: {
       type: Number,
       required: true,
       unique: true,
     },
-    addons_id: {
-      type: [Number],
-      default: [],
+    event: {
+      type: Number,
+      required: true,
     },
-    voucher_id: {
+    voucher: {
       type: Number,
     },
     total: {
@@ -44,6 +48,10 @@ var bookingSchema = new mongoose.Schema(
       type: String,
       enum: Object.values(BookingStatus),
       default: BookingStatus.Pending,
+    },
+    join: {
+      type: Boolean,
+      default: false,
     },
   },
   {
